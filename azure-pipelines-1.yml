@@ -1,0 +1,86 @@
+---
+- name: CPU usage check
+
+  hosts: all
+
+  gather_facts: no
+
+  tasks:
+
+    - name: Check if df command is available
+
+      command: which df
+
+      register: df_command
+
+      ignore_errors: yes
+
+ 
+
+    - name: Fail if df command is not found
+
+      fail:
+
+        msg: "DF COMMAND NOT FOUND : Unable to perform this task : Please route the ticket to Linux Compute Team!!!"
+
+      when: df_command.rc != 0
+
+ 
+
+    - name: Get CPU usage for /var
+
+      command: df -g /var
+
+      register: df_output
+
+      when: df_command.rc == 0
+
+ 
+
+    - name: Calculate CPU usage
+
+      set_fact:
+
+        cpu_usage: "{{ df_output.stdout_lines[-1].split()[3].split('%')[0]|int }}"
+
+      when: df_command.rc == 0
+
+ 
+
+    - name: Check if CPU usage is above threshold
+
+      block:
+
+        - name: Display top 5 directories by size in /var
+
+          command: du -sh /var/* | sort -nr | head -5
+
+          register: top_directories
+
+          when: cpu_usage > 95
+
+ 
+
+        - name: Output high CPU usage message
+
+          debug:
+
+            msg: "{{ cpu_usage }}% is greater than 95%. Please route this ticket to Linux Compute Team!!!"
+
+          when: cpu_usage > 95
+
+ 
+
+      when: df_command.rc == 0
+
+ 
+
+    - name: Output low CPU usage message
+
+      debug:
+
+        msg: "{{ cpu_usage }}% is below 95%. Please close the Alert"
+
+      when: df_command.rc == 0 and cpu_usage <= 95
+
+ 
